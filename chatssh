@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+from openai import OpenAI
+from colorama import Fore, Style
+import json
+
+
+def call_api(messages, client, model="deepseek-chat"):
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            stream=False
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        raise e
+        return f"Error: {e}"
+
+
+def chat_loop(client, model="deepseek-chat"):
+    print("Welcome to ChatSSH!")
+    print(f"Now using model: {Fore.GREEN} {model} {Style.RESET_ALL}")
+
+    messages = [
+        {"role": "system", "content": "You are a helpful assistent."}
+    ]
+    while True:
+        try:
+            user_input = input(f"{Style.RESET_ALL}$: {Fore.CYAN}").strip()
+            messages.append(
+                {"role": "user", "content": user_input}
+            )
+            response = call_api(messages, client, model)
+            messages.append({"role": "assistant", "content": response})
+            print(f"{Fore.GREEN} {response}")
+        except KeyboardInterrupt:
+            print(f"{Fore.RED}\nSession ended. {Style.RESET_ALL}")
+            break
+
+
+if __name__ == '__main__':
+    config_path = None
+    if config_path is None:
+        config_path = "/etc/chatssh.json"
+    with open(config_path, "r") as f:
+        config = json.load(f)
+
+    provider = config['provider']
+    model = config['model']
+    base_url = config[provider]['base_url']
+    api_key = config[provider]['api_key']
+
+
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    chat_loop(client, model=model)
+
+
+    
+
+

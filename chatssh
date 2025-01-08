@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 from openai import OpenAI
-from colorama import Fore, Style
+from prompt_toolkit import PromptSession
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.application import run_in_terminal
+from prompt_toolkit.shortcuts import clear
+from colorama import Fore, Style, init as colorama_init
 import json
 
 
@@ -17,25 +21,106 @@ def call_api(messages, client, model="deepseek-chat"):
         return f"Error: {e}"
 
 
-def chat_loop(client, model="deepseek-chat"):
-    print("Welcome to ChatSSH!")
+def clean_emojies(text, emoji_map):
+    for emoji in emoji_map:
+        text = text.replace(emoji, emoji_map[emoji])
+    return text
+
+
+def chat_loop(client, config, model="deepseek-chat"):
+    colorama_init(autoreset=True)
+    print("Welcome to ChatSSH!, <ctrl-c> to exit, and <ctrl-enter> to send message.")
     print(f"Now using model: {Fore.GREEN} {model} {Style.RESET_ALL}")
 
     messages = [
-        {"role": "system", "content": "You are a helpful assistent."}
+        {"role": "system", "content": "You are a helpful assistant."}
     ]
-    while True:
+
+    session = PromptSession()
+    bindings = KeyBindings()
+
+    # Initialize shared input variable
+    input_buffer = []
+        
+    @bindings.add('enter')  # Regular Enter for a new line
+    def _(event):
+        input_buffer.append(event.app.current_buffer.text)
+        event.app.current_buffer.insert_text("\n")
+
+    @bindings.add('c-j')  # Ctrl+Enter to send message
+    def _(event):
+        user_input = "\n".join(input_buffer + [event.app.current_buffer.text])
+        event.app.current_buffer.reset()  # Clear the buffer
+        input_buffer.clear()
+        run_in_terminal(lambda: reprint_user_input(user_input))
+        run_in_terminal(lambda: call_api_and_get_resp(user_input))
+        
+    @bindings.add('up')  # Handle Up Arrow for line navigation
+    def _(event):
+        current_buffer = event.app.current_buffer
+        document = current_buffer.document
+
+        # Move to the same column in the previous line if possible
+        if document.cursor_position_row > 0:
+            target_column = document.cursor_position_col
+            previous_line_length = len(document.lines[document.cursor_position_row - 1])
+            new_column = min(previous_line_length, target_column)
+            current_buffer.cursor_position += document.get_start_of_line_position(-1) + new_column
+
+    @bindings.add('down')  # Handle Down Arrow for line navigation
+    def _(event):
+        current_buffer = event.app.current_buffer
+        document = current_buffer.document
+
+        # Move to the same column in the next line if possible
+        if document.cursor_position_row < document.line_count - 1:
+            target_column = document.cursor_position_col
+            next_line_length = len(document.lines[document.cursor_position_row + 1])
+            new_column = min(next_line_length, target_column)
+            current_buffer.cursor_position += document.get_start_of_line_position(1) + new_column
+            
+    @bindings.add('backspace')  # Handle Backspace
+    def _(event):
+        current_buffer = event.app.current_buffer
+        document = current_buffer.document
+
+        # Remove the character before the cursor
+        if current_buffer.cursor_position > 0:
+            if document.cursor_position_col == 0:  # At the start of a line
+                # Merge with the previous line
+                current_row = document.cursor_position_row
+                if current_row > 0:  # Ensure there's a previous line
+                    previous_line_length = len(document.lines[current_row - 1])
+                    current_buffer.cursor_position += document.get_start_of_line_position(-1)
+                    current_buffer.delete_before_cursor()  # Delete the newline character
+            else:
+                current_buffer.delete_before_cursor()
+
+    def reprint_user_input(user_input):
+        print(f"{Fore.CYAN}{user_input}{Style.RESET_ALL}")
+        
+    def call_api_and_get_resp(user_input):
+        nonlocal messages
+        if not user_input.strip():
+            return
+
+        # Add user input to the conversation
+        messages.append({"role": "user", "content": user_input})
+
         try:
-            user_input = input(f"{Style.RESET_ALL}$: {Fore.CYAN}").strip()
-            messages.append(
-                {"role": "user", "content": user_input}
-            )
+            # Get API response
             response = call_api(messages, client, model)
             messages.append({"role": "assistant", "content": response})
-            print(f"{Fore.GREEN} {response}")
-        except KeyboardInterrupt:
-            print(f"{Fore.RED}\nSession ended. {Style.RESET_ALL}")
-            break
+            response = clean_emojies(response, config['emojis'])
+            print(f"{Fore.GREEN}{response}{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
+
+    try:
+        while True:
+            session.prompt(f"$:", key_bindings=bindings)
+    except KeyboardInterrupt:
+        print(f"{Fore.RED}\nSession ended. {Style.RESET_ALL}")
 
 
 if __name__ == '__main__':
@@ -52,7 +137,7 @@ if __name__ == '__main__':
 
 
     client = OpenAI(api_key=api_key, base_url=base_url)
-    chat_loop(client, model=model)
+    chat_loop(client, config, model=model)
 
 
     

@@ -29,72 +29,65 @@ def clean_emojies(text, emoji_map):
 
 def chat_loop(client, config, model="deepseek-chat"):
     colorama_init(autoreset=True)
-    print("Welcome to ChatSSH!, <ctrl-c> to exit, and <ctrl-enter> to send message.")
+    if "ctrl_enter_new_line" in config and config["ctrl_enter_new_line"]:
+        new_line_key = "c-j"
+        send_key = "enter"
+    else:
+        new_line_key = "enter"
+        send_key = "c-j"
+    print(f"Welcome to ChatSSH!, <ctrl-c> to exit, and {send_key} to send message, and {new_line_key} for new line.")
     print(f"Now using model: {Fore.GREEN} {model} {Style.RESET_ALL}")
 
     messages = [
-        {"role": "system", "content": "You are a helpful assistant."}
+        {"role": "system", "content": "You are a helpful assistant, keep everything brief."}
     ]
 
     session = PromptSession()
     bindings = KeyBindings()
 
-    # Initialize shared input variable
-    input_buffer = []
-        
-    @bindings.add('enter')  # Regular Enter for a new line
+    @bindings.add(new_line_key)
     def _(event):
-        input_buffer.append(event.app.current_buffer.text)
         event.app.current_buffer.insert_text("\n")
 
-    @bindings.add('c-j')  # Ctrl+Enter to send message
+    @bindings.add(send_key)
     def _(event):
-        user_input = "\n".join(input_buffer + [event.app.current_buffer.text])
-        event.app.current_buffer.reset()  # Clear the buffer
-        input_buffer.clear()
+        user_input = event.app.current_buffer.text.strip()
+    
+        event.app.current_buffer.reset()  
+    
         run_in_terminal(lambda: reprint_user_input(user_input))
         run_in_terminal(lambda: call_api_and_get_resp(user_input))
         
-    @bindings.add('up')  # Handle Up Arrow for line navigation
+    @bindings.add('up') 
     def _(event):
         current_buffer = event.app.current_buffer
         document = current_buffer.document
 
-        # Move to the same column in the previous line if possible
         if document.cursor_position_row > 0:
             target_column = document.cursor_position_col
             previous_line_length = len(document.lines[document.cursor_position_row - 1])
             new_column = min(previous_line_length, target_column)
             current_buffer.cursor_position += document.get_start_of_line_position(-1) + new_column
 
-    @bindings.add('down')  # Handle Down Arrow for line navigation
+    @bindings.add('down')  
     def _(event):
         current_buffer = event.app.current_buffer
         document = current_buffer.document
 
-        # Move to the same column in the next line if possible
         if document.cursor_position_row < document.line_count - 1:
             target_column = document.cursor_position_col
             next_line_length = len(document.lines[document.cursor_position_row + 1])
             new_column = min(next_line_length, target_column)
             current_buffer.cursor_position += document.get_start_of_line_position(1) + new_column
             
-    @bindings.add('backspace')  # Handle Backspace
+    @bindings.add('backspace')
     def _(event):
         current_buffer = event.app.current_buffer
         document = current_buffer.document
 
-        # Remove the character before the cursor
         if current_buffer.cursor_position > 0:
-            if document.cursor_position_col == 0:  # At the start of a line
-                # Merge with the previous line
-                current_row = document.cursor_position_row
-                if current_row > 0:  # Ensure there's a previous line
-                    previous_line_length = len(document.lines[current_row - 1])
-                    current_buffer.cursor_position += document.get_start_of_line_position(-1)
-                    current_buffer.delete_before_cursor()  # Delete the newline character
-            else:
                 current_buffer.delete_before_cursor()
+        event.app.current_buffer.text = current_buffer.text
 
     def reprint_user_input(user_input):
         print(f"{Fore.CYAN}{user_input}{Style.RESET_ALL}")

@@ -1,6 +1,7 @@
 {
     "provider": "deepseek",
     "model": "deepseek-chat",
+    "ctrl_enter_new_line": true,
     "deepseek": {
         "base_url": "https://api.deepseek.com",
         "api_key": ""

@@ -35,7 +35,7 @@ def chat_loop(client, config, model="deepseek-chat"):
     else:
         new_line_key = "enter"
         send_key = "c-j"
-    print(f"Welcome to ChatSSH!, <ctrl-c> to exit, and {send_key} to send message, and {new_line_key} for new line.")
+    print(f"Welcome to ChatSSH!, <ctrl-c> to exit, and {send_key} to send message, and {new_line_key} for new line, <c-n> for new session.")
     print(f"Now using model: {Fore.GREEN} {model} {Style.RESET_ALL}")
 
     messages = [
@@ -88,6 +88,10 @@ def chat_loop(client, config, model="deepseek-chat"):
         if current_buffer.cursor_position > 0:
                 current_buffer.delete_before_cursor()
         event.app.current_buffer.text = current_buffer.text
+        
+    @bindings.add("c-n")
+    def _(event):
+        event.app.exit(result="new")
 
     def reprint_user_input(user_input):
         print(f"{Fore.CYAN}{user_input}{Style.RESET_ALL}")
@@ -111,9 +115,12 @@ def chat_loop(client, config, model="deepseek-chat"):
 
     try:
         while True:
-            session.prompt(f"$:", key_bindings=bindings)
+            ret = session.prompt(f"$:", key_bindings=bindings)
+            if ret == "new":
+                return ret
     except KeyboardInterrupt:
         print(f"{Fore.RED}\nSession ended. {Style.RESET_ALL}")
+        return "end"
 
 
 if __name__ == '__main__':
@@ -130,9 +137,13 @@ if __name__ == '__main__':
 
 
     client = OpenAI(api_key=api_key, base_url=base_url)
-    chat_loop(client, config, model=model)
-
-
-    
-
+    while True:
+        results = chat_loop(client, config, model=model)
+        if results == "end":
+            break
+        elif results == "new":
+            clear()
+            continue
+        else:
+            break
 

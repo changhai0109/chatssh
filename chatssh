@@ -38,8 +38,13 @@ def chat_loop(client, config, model="deepseek-chat"):
     print(f"Welcome to ChatSSH!, <ctrl-c> to exit, and {send_key} to send message, and {new_line_key} for new line, <c-n> for new session.")
     print(f"Now using model: {Fore.GREEN} {model} {Style.RESET_ALL}")
 
+    system_role_name = "system"
+    if model in {}:
+        system_role_name = "developer"
+    elif model in {"o1-mini", "o1", "o1-preview"}:
+        system_role_name = "user"
     messages = [
-        {"role": "system", "content": "You are a helpful assistant, keep everything brief."}
+        {"role": system_role_name, "content": "You are a helpful assistant, keep everything brief."}
     ]
 
     session = PromptSession()
@@ -93,6 +98,10 @@ def chat_loop(client, config, model="deepseek-chat"):
     def _(event):
         event.app.exit(result="new")
 
+    @bindings.add("c-b")
+    def _(event):
+        event.app.exit(result="change_model")
+
     def reprint_user_input(user_input):
         print(f"{Fore.CYAN}{user_input}{Style.RESET_ALL}")
         
@@ -116,16 +125,51 @@ def chat_loop(client, config, model="deepseek-chat"):
     try:
         while True:
             ret = session.prompt(f"$:", key_bindings=bindings)
-            if ret == "new":
+            if ret in {"new", "change_model"}:
                 return ret
     except KeyboardInterrupt:
         print(f"{Fore.RED}\nSession ended. {Style.RESET_ALL}")
         return "end"
 
+def change_model(config):
+    while True:
+        available_providers = {"deepseek", "openai"}
+        print(f"Enter the provider you want to use: {Fore.GREEN}")
+        for provider in available_providers:
+            print(f"{provider}")
+        print(f"{Style.RESET_ALL}")
+        provider = input().strip()
+        if provider in config.keys() and "base_url" in config[provider] and "api_key" in config[provider]:
+            break
+        print(f"{Fore.RED}Invalid provider or incomplete config file, try again.{Style.RESET_ALL}")
+    base_url = config[provider]['base_url']
+    api_key = config[provider]['api_key']
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    
+    while True:
+        print(f"{Fore.YELLOW}Enter the model you want to use {Fore.GREEN}")
+        available_models = list()
+        for model in client.models.list():
+            available_models.append(model.id)
+        for model in available_models:
+            print(f"{model}")
+        print(f"{Style.RESET_ALL}")
+        model = input().strip()
+        
+        if model in available_models:
+            break
+        print(f"{Fore.RED}Invalid model, try again.{Style.RESET_ALL}")
+    return client, model
+    
 
 if __name__ == '__main__':
+    import os
     config_path = None
     if config_path is None:
+        config_path = "~/.config/chatssh.json"
+    if os.path.exists(config_path):
+        config_path = os.path.expanduser(config_path)
+    else:
         config_path = "/etc/chatssh.json"
     with open(config_path, "r") as f:
         config = json.load(f)
@@ -143,7 +187,9 @@ if __name__ == '__main__':
             break
         elif results == "new":
             clear()
-            continue
+        elif results == "change_model":
+            clear()
+            client, model = change_model(config)
         else:
             break
 

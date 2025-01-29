@@ -28,12 +28,13 @@ def install():
     if default_provider == '':
         default_provider = 'deepseek'
     config['provider'] = default_provider
-    default_model = input("default_model [deepseek-chat]").strip()
+    default_model = input("default_model [deepseek-reasoner]").strip()
     if default_model == '':
-        default_model = 'deepseek-chat'
+        default_model = 'deepseek-reasoner'
     config['model'] = default_model
     with open("/etc/chatssh.json", "w") as f:
         json.dump(config, f, indent=4)
+
 
 def uninstall():
     username = "chat"

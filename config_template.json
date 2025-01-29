@@ -1,7 +1,7 @@
 {
     "provider": "deepseek",
     "model": "deepseek-chat",
-    "ctrl_enter_new_line": true,
+    "ctrl_enter_new_line": false,
     "deepseek": {
         "base_url": "https://api.deepseek.com",
         "api_key": ""
@@ -9,6 +9,10 @@
     "openai": {
         "base_url": "https://api.openai.com/v1",
         "api_key": ""
+    },
+    "ollama": {
+        "base_url": "http://localhost:11434/v1",
+        "api_key": "ollama"
     },
     "emojis": {
         "😊": ":)",

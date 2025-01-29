@@ -8,19 +8,6 @@ from colorama import Fore, Style, init as colorama_init
 import json
 
 
-def call_api(messages, client, model="deepseek-chat"):
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=False
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        raise e
-        return f"Error: {e}"
-
-
 def clean_emojies(text, emoji_map):
     for emoji in emoji_map:
         text = text.replace(emoji, emoji_map[emoji])
@@ -112,13 +99,37 @@ def chat_loop(client, config, model="deepseek-chat"):
 
         # Add user input to the conversation
         messages.append({"role": "user", "content": user_input})
-
         try:
-            # Get API response
-            response = call_api(messages, client, model)
-            messages.append({"role": "assistant", "content": response})
-            response = clean_emojies(response, config['emojis'])
-            print(f"{Fore.GREEN}{response}{Style.RESET_ALL}")
+            if "streaming" in config and not config["streaming"]:
+                # Get API response
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    stream=False
+                )
+                response = response.choices[0].message.content
+                messages.append({"role": "assistant", "content": response})
+                response = clean_emojies(response, config['emojis'])
+                print(f"{Fore.GREEN}{response}{Style.RESET_ALL}")
+            else:
+                full_response = ""
+                # Start streaming API call
+                stream = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    stream=True  # Enable streaming
+                )
+
+                # Print responses chunk by chunk
+                for chunk in stream:
+                    chunk_content = chunk.choices[0].delta.content or ""
+                    chunk_content = clean_emojies(chunk_content, config['emojis'])
+                    full_response += chunk_content
+                    print(f"{Fore.GREEN}{chunk_content}{Style.RESET_ALL}", end="", flush=True)
+                print("")
+
+                # Store complete response and clean
+                messages.append({"role": "assistant", "content": full_response})
         except Exception as e:
             print(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
 

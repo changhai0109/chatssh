@@ -35,7 +35,7 @@ def chat_loop(client, config, model="deepseek-chat"):
     else:
         new_line_key = "enter"
         send_key = "c-j"
-    print(f"Welcome to ChatSSH!, <ctrl-c> to exit, and {send_key} to send message, and {new_line_key} for new line, <c-n> for new session.")
+    print(f"Welcome to ChatSSH!, <ctrl-c> to exit, <{send_key}> to send message, <{new_line_key}> for new line, <c-n> for new session, <c-b> for change models.")
     print(f"Now using model: {Fore.GREEN} {model} {Style.RESET_ALL}")
 
     system_role_name = "system"
